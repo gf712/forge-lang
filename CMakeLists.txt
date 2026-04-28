@@ -41,6 +41,13 @@ FetchContent_Declare(
     GIT_TAG main)
 FetchContent_MakeAvailable(pretty_diagnostics)
 
+FetchContent_Declare(
+    cpp_peglib
+    GIT_REPOSITORY https://github.com/yhirose/cpp-peglib
+    GIT_TAG v1.9.0
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(cpp_peglib)
+
 add_subdirectory(lib)
 add_subdirectory(tools)
 add_subdirectory(tests)
