@@ -1,0 +1,8 @@
+// RUN: %forge %s --emit-mlir | %FileCheck %s
+
+// CHECK: module {
+// CHECK:   func.func @__main() attributes {llvm.emit_c_interface}
+// CHECK:     %c1_i64 = arith.constant 1 : i64
+// CHECK:     %c2_i64 = arith.constant 2 : i64
+// CHECK:     %0 = arith.addi %c1_i64, %c2_i64 : i64
+// CHECK:     return
