@@ -21,6 +21,13 @@ mlir::Value MLIRGenerator::generate(const ast::Module &) {
     return {};
 }
 
+mlir::Value MLIRGenerator::generate(const ast::Identifier &id) { return value_map.at(id.name); }
+
+mlir::Value MLIRGenerator::generate(const ast::LetBinding &binding) {
+    value_map[binding.name] = binding.value->visit(*this);
+    return {};
+}
+
 mlir::ModuleOp MLIRGenerator::generate_module(const ast::Module &module_node) {
     auto module_op = mlir::ModuleOp::create(builder.getUnknownLoc());
     builder.setInsertionPointToStart(&module_op.getBodyRegion().front());
@@ -44,6 +51,12 @@ mlir::Value MLIRGenerator::generate(const ast::BinaryOperator &op) {
     switch (op.op) {
     case ast::BinaryOperator::OpType::Add:
         return mlir::arith::AddIOp::create(builder, builder.getUnknownLoc(), lhs, rhs);
+    case ast::BinaryOperator::OpType::Sub:
+        return mlir::arith::SubIOp::create(builder, builder.getUnknownLoc(), lhs, rhs);
+    case ast::BinaryOperator::OpType::Mul:
+        return mlir::arith::MulIOp::create(builder, builder.getUnknownLoc(), lhs, rhs);
+    case ast::BinaryOperator::OpType::Div:
+        return mlir::arith::DivSIOp::create(builder, builder.getUnknownLoc(), lhs, rhs);
     }
 }
 

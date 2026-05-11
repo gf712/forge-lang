@@ -1,0 +1,5 @@
+// RUN: not %forge %s 2>&1 | %FileCheck %s
+
+// CHECK: error: use of undefined variable 'z'
+
+let x = z + 1

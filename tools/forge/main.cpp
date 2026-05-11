@@ -6,6 +6,7 @@
 #include "forge/Conversion/MLIRToLLVM/Passes.h"
 #include "forge/Diagnostics/Emitter.h"
 #include "forge/Frontend/Parser.h"
+#include "forge/Frontend/SymbolResolver.h"
 #include "forge/Frontend/TypeChecker.h"
 #include "forge/Target/JIT.h"
 
@@ -39,9 +40,15 @@ int main(int argc, char **argv) {
     llvm::SourceMgr source_mgr;
     forge::DiagnosticEmitter emitter{source_mgr};
 
-    auto ast = Parser::parse(source_path, source_mgr);
+    auto ast = Parser::parse(source_path, source_mgr, emitter);
     if (!ast)
         return EXIT_FAILURE;
+
+    {
+        forge::SymbolResolver resolver{emitter};
+        if (!resolver.resolve(*ast))
+            return EXIT_FAILURE;
+    }
 
     {
         mlir::MLIRContext type_ctx;
