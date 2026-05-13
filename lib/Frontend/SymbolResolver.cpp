@@ -1,4 +1,5 @@
 #include "forge/Frontend/SymbolResolver.h"
+#include "forge/Frontend/AST.h"
 #include <cassert>
 
 // Visitor dispatch: routes each AST node's resolve() call to the correct check() overload.
@@ -10,8 +11,9 @@ AST_NODE_TYPES
 namespace forge {
 
 bool SymbolResolver::resolve(const ast::Module &module) {
-    for (const auto &node : module.nodes)
+    for (const auto &node : module.nodes) {
         node->resolve(*this);
+    }
     return !emitter.has_errors();
 }
 
@@ -23,14 +25,26 @@ void SymbolResolver::check(const ast::BinaryOperator &op) {
 }
 
 void SymbolResolver::check(const ast::Identifier &id) {
-    if (!symbols.contains(id.name))
+    if (!symbols.contains(id.name)) {
         emitter.error(id.loc, "use of undefined variable '" + id.name + "'", "not defined");
+    }
 }
 
 void SymbolResolver::check(const ast::LetBinding &binding) {
     // Resolve the value expression before adding the name so `let x = x` is an error.
     binding.value->resolve(*this);
     symbols.insert(binding.name);
+}
+
+void SymbolResolver::check(const ast::ReturnStmt &return_stmt) { return_stmt.expr->resolve(*this); }
+
+void SymbolResolver::check(const ast::FunctionDecl &function_decl) {
+    for (const auto &[param_name, _] : function_decl.params) {
+        symbols.insert(param_name);
+    }
+    for (const auto &stmt : function_decl.nodes) {
+        stmt->resolve(*this);
+    }
 }
 
 void SymbolResolver::check(const ast::Module &) {

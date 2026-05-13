@@ -12,11 +12,9 @@ class SymbolResolver {
 
     bool resolve(const ast::Module &module);
 
-    void check(const ast::IntLiteral &);
-    void check(const ast::BinaryOperator &);
-    void check(const ast::Identifier &);
-    void check(const ast::LetBinding &);
-    void check(const ast::Module &);
+#define __AST_NODE_TYPE(TYPE) void check(const ast::TYPE &);
+    AST_NODE_TYPES
+#undef __AST_NODE_TYPE
 
   private:
     DiagnosticEmitter &emitter;

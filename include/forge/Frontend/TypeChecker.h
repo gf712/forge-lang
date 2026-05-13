@@ -15,11 +15,9 @@ class TypeChecker {
 
     bool check(const ast::Module &module);
 
-    mlir::Type infer(const ast::IntLiteral &);
-    mlir::Type infer(const ast::BinaryOperator &);
-    mlir::Type infer(const ast::Identifier &);
-    mlir::Type infer(const ast::LetBinding &);
-    mlir::Type infer(const ast::Module &);
+#define __AST_NODE_TYPE(TYPE) mlir::Type infer(const ast::TYPE &);
+    AST_NODE_TYPES
+#undef __AST_NODE_TYPE
 
     mlir::Type resolve(const ast::UnresolvedTypeRef &);
 

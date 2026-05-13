@@ -36,7 +36,9 @@ struct UnresolvedTypeRef final : TypeExpr {
     __AST_NODE_TYPE(Identifier)                                                                    \
     __AST_NODE_TYPE(IntLiteral)                                                                    \
     __AST_NODE_TYPE(LetBinding)                                                                    \
-    __AST_NODE_TYPE(Module)
+    __AST_NODE_TYPE(Module)                                                                        \
+    __AST_NODE_TYPE(FunctionDecl)                                                                  \
+    __AST_NODE_TYPE(ReturnStmt)
 
 enum class ASTNodeType {
 #define __AST_NODE_TYPE(X) X,
@@ -97,6 +99,32 @@ struct LetBinding final : Node {
                std::unique_ptr<Expression> value)
         : name(std::move(name)), type_annotation(std::move(type_annotation)),
           value(std::move(value)) {}
+    mlir::Value visit(MLIRGenerator &) const final;
+    mlir::Type type_of(forge::TypeChecker &) const final;
+    void resolve(forge::SymbolResolver &) const final;
+};
+
+struct FunctionDecl final : Node {
+    using ParamType = std::pair<std::string, UnresolvedTypeRef>;
+    std::string name;
+    std::vector<ParamType> params;
+    UnresolvedTypeRef return_type;
+    std::vector<std::unique_ptr<Node>> nodes;
+
+    FunctionDecl(std::string name, std::vector<ParamType> params, UnresolvedTypeRef return_type,
+                 std::vector<std::unique_ptr<Node>> nodes)
+        : name(std::move(name)), params(std::move(params)), return_type(std::move(return_type)),
+          nodes(std::move(nodes)) {}
+
+    mlir::Value visit(MLIRGenerator &) const final;
+    mlir::Type type_of(forge::TypeChecker &) const final;
+    void resolve(forge::SymbolResolver &) const final;
+};
+
+struct ReturnStmt final : Node {
+    std::unique_ptr<Expression> expr;
+    ReturnStmt(std::unique_ptr<Expression> expr) : expr(std::move(expr)) {}
+
     mlir::Value visit(MLIRGenerator &) const final;
     mlir::Type type_of(forge::TypeChecker &) const final;
     void resolve(forge::SymbolResolver &) const final;

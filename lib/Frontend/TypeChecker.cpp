@@ -1,5 +1,6 @@
 #include "forge/Frontend/TypeChecker.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Types.h"
 
 // Visitor dispatch: routes each AST node's type_of() call to the correct infer() overload.
 #define __AST_NODE_TYPE(X)                                                                         \
@@ -23,8 +24,9 @@ TypeChecker::TypeChecker(mlir::MLIRContext &ctx, DiagnosticEmitter &emitter)
 }
 
 bool TypeChecker::check(const ast::Module &module) {
-    for (const auto &node : module.nodes)
+    for (const auto &node : module.nodes) {
         node->type_of(*this);
+    }
     return !emitter.has_errors();
 }
 
@@ -43,8 +45,9 @@ mlir::Type TypeChecker::infer(const ast::BinaryOperator &op) {
     auto lhs = op.lhs->type_of(*this);
     auto rhs = op.rhs->type_of(*this);
 
-    if (!lhs || !rhs)
+    if (!lhs || !rhs) {
         return {};
+    }
 
     auto check_int = [&](const char *sym) -> mlir::Type {
         if (!llvm::isa<mlir::IntegerType>(lhs) || !llvm::isa<mlir::IntegerType>(rhs)) {
@@ -69,8 +72,9 @@ mlir::Type TypeChecker::infer(const ast::BinaryOperator &op) {
 
 mlir::Type TypeChecker::infer(const ast::Identifier &id) {
     auto it = symbol_types.find(id.name);
-    if (it == symbol_types.end())
+    if (it == symbol_types.end()) {
         return {};
+    }
     return it->second;
 }
 
@@ -92,9 +96,27 @@ mlir::Type TypeChecker::infer(const ast::LetBinding &binding) {
         }
     }
 
-    if (inferred)
+    if (inferred) {
         symbol_types[binding.name] = inferred;
+    }
     return inferred;
+}
+
+mlir::Type TypeChecker::infer(const ast::ReturnStmt &return_stmt) {
+    [[maybe_unused]] auto return_type = return_stmt.expr->type_of(*this);
+    // TODO: check return type match function signature
+    return {};
+}
+
+mlir::Type TypeChecker::infer(const ast::FunctionDecl &function_decl) {
+    for (const auto &[param_name, param_type] : function_decl.params) {
+        symbol_types[param_name] = param_type.resolve(*this);
+    }
+    for (const auto &stmt : function_decl.nodes) {
+        stmt->type_of(*this);
+    }
+    // TODO: return function type
+    return {};
 }
 
 mlir::Type TypeChecker::infer(const ast::Module &) {

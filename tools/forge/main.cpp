@@ -24,12 +24,13 @@ int main(int argc, char **argv) {
 
     for (int i = 1; i < argc; ++i) {
         std::string_view arg{argv[i]};
-        if (arg == "--emit-mlir")
+        if (arg == "--emit-mlir") {
             emit_mlir = true;
-        else if (arg == "--emit-llvm")
+        } else if (arg == "--emit-llvm") {
             emit_llvm = true;
-        else
+        } else {
             source_path = arg;
+        }
     }
 
     if (source_path.empty()) {
@@ -41,20 +42,23 @@ int main(int argc, char **argv) {
     forge::DiagnosticEmitter emitter{source_mgr};
 
     auto ast = Parser::parse(source_path, source_mgr, emitter);
-    if (!ast)
+    if (!ast) {
         return EXIT_FAILURE;
+    }
 
     {
         forge::SymbolResolver resolver{emitter};
-        if (!resolver.resolve(*ast))
+        if (!resolver.resolve(*ast)) {
             return EXIT_FAILURE;
+        }
     }
 
     {
         mlir::MLIRContext type_ctx;
         forge::TypeChecker checker{type_ctx, emitter};
-        if (!checker.check(*ast))
+        if (!checker.check(*ast)) {
             return EXIT_FAILURE;
+        }
     }
 
     auto mod = MLIRGenerator::compile(std::move(ast));
@@ -62,14 +66,17 @@ int main(int argc, char **argv) {
     if (emit_mlir) {
         llvm::outs() << *mod.module_op << '\n';
         llvm::outs().flush();
+        return EXIT_SUCCESS;
     }
 
-    if (!forge::lower(mod))
+    if (!forge::lower(mod)) {
         return EXIT_FAILURE;
+    }
 
     if (emit_llvm) {
         llvm::outs() << *mod.module_op << '\n';
         llvm::outs().flush();
+        return EXIT_SUCCESS;
     }
 
     return forge::execute(mod) ? EXIT_SUCCESS : EXIT_FAILURE;

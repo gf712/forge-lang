@@ -7,4 +7,5 @@
 // CHECK:     %0 = arith.addi %c1_i64, %c2_i64 : i64
 // CHECK:     return
 
-1 + 2
+let x: i64 = 1 + 2;
+let y: i64 = x + 2;

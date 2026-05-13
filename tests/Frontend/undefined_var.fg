@@ -2,4 +2,4 @@
 
 // CHECK: error: use of undefined variable 'z'
 
-let x = z + 1
+let x = z + 1;

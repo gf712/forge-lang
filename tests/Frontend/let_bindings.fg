@@ -6,6 +6,6 @@
 // CHECK: %c3_i64 = arith.constant 3 : i64
 // CHECK: arith.addi %[[X]], %c3_i64
 
-let x = 1 + 2
-let y = x + 3
+let x = 1 + 2;
+let y = x + 3;
 y

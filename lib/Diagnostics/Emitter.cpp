@@ -12,8 +12,9 @@ DiagnosticEmitter::DiagnosticEmitter(llvm::SourceMgr &source_mgr, std::ostream &
 std::shared_ptr<pretty_diagnostics::StringSource>
 DiagnosticEmitter::get_source(unsigned buffer_id) {
     auto it = sources_.find(buffer_id);
-    if (it != sources_.end())
+    if (it != sources_.end()) {
         return it->second;
+    }
 
     auto *mem = source_mgr_.getMemoryBuffer(buffer_id);
     std::string content{mem->getBufferStart(), mem->getBufferEnd()};
@@ -30,6 +31,14 @@ pretty_diagnostics::Span DiagnosticEmitter::make_span(llvm::SMRange range) {
     // LLVM returns 1-based line/col; pretty_diagnostics expects 0-based.
     auto [sl, sc] = source_mgr_.getLineAndColumn(range.Start);
     auto [el, ec] = source_mgr_.getLineAndColumn(range.End);
+    // pretty_diagnostics' renderer does `for (col; col < end - 1; ...)` on size_t and
+    // underflows when the 0-based end column is 0 — either a zero-width span at col 1
+    // or a span that ends at col 1 of a later line. Collapse to a 1-col-wide single-line
+    // span anchored at the start position.
+    if (sl != el || sc >= ec) {
+        el = sl;
+        ec = sc + 1;
+    }
     return {source, sl - 1, sc - 1, el - 1, ec - 1};
 }
 
@@ -42,8 +51,9 @@ void DiagnosticEmitter::error(llvm::SMRange range, std::string_view message, std
                        .message(std::string(message))
                        .label(std::string(label), make_span(range));
 
-    if (note)
+    if (note) {
         builder.note(std::string(*note));
+    }
 
     const auto report = builder.build();
     auto renderer = pretty_diagnostics::TextRenderer(report);
