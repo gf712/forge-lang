@@ -1,0 +1,11 @@
+// RUN: %forge test %s
+
+// A test whose assertion holds runs to completion under `forge test` and exits 0.
+
+fn add(a: i64, b: i64) -> i64 {
+	a + b
+}
+
+test "addition works" {
+	@assert(add(1, 2) == 3)
+}

@@ -17,6 +17,7 @@ namespace forge {
 
 TypeChecker::TypeChecker(mlir::MLIRContext &ctx, DiagnosticEmitter &emitter)
     : ctx(ctx), emitter(emitter) {
+    type_registry["bool"] = mlir::IntegerType::get(&ctx, 1);
     type_registry["i32"] = mlir::IntegerType::get(&ctx, 32);
     type_registry["i64"] = mlir::IntegerType::get(&ctx, 64);
     type_registry["f32"] = mlir::Float32Type::get(&ctx);
@@ -24,6 +25,19 @@ TypeChecker::TypeChecker(mlir::MLIRContext &ctx, DiagnosticEmitter &emitter)
 }
 
 bool TypeChecker::check(const ast::Module &module) {
+    // Pre-register signatures so calls type-check against any function regardless
+    // of source order (forward references) and recursion.
+    for (const auto &node : module.nodes) {
+        if (const auto *fn = dynamic_cast<const ast::FunctionDecl *>(node.get())) {
+            FunctionSignature sig;
+            sig.params.reserve(fn->params.size());
+            for (const auto &[_, param_type] : fn->params) {
+                sig.params.push_back(param_type.resolve(*this));
+            }
+            sig.return_type = fn->return_type.resolve(*this);
+            function_signatures[fn->name] = std::move(sig);
+        }
+    }
     for (const auto &node : module.nodes) {
         node->type_of(*this);
     }
@@ -58,6 +72,21 @@ mlir::Type TypeChecker::infer(const ast::BinaryOperator &op) {
         return lhs;
     };
 
+    // Comparisons require integer operands of the same type and yield a bool (i1).
+    auto check_cmp = [&](const char *sym) -> mlir::Type {
+        if (!llvm::isa<mlir::IntegerType>(lhs) || !llvm::isa<mlir::IntegerType>(rhs)) {
+            emitter.error(op.loc, std::string("'") + sym + "' requires integer operands",
+                          "expected integer");
+            return {};
+        }
+        if (lhs != rhs) {
+            emitter.error(op.loc, std::string("'") + sym + "' requires operands of the same type",
+                          "mismatched types");
+            return {};
+        }
+        return mlir::IntegerType::get(&ctx, 1);
+    };
+
     switch (op.op) {
     case ast::BinaryOperator::OpType::Add:
         return check_int("+");
@@ -67,7 +96,20 @@ mlir::Type TypeChecker::infer(const ast::BinaryOperator &op) {
         return check_int("*");
     case ast::BinaryOperator::OpType::Div:
         return check_int("/");
+    case ast::BinaryOperator::OpType::Eq:
+        return check_cmp("==");
+    case ast::BinaryOperator::OpType::Ne:
+        return check_cmp("!=");
+    case ast::BinaryOperator::OpType::Lt:
+        return check_cmp("<");
+    case ast::BinaryOperator::OpType::Le:
+        return check_cmp("<=");
+    case ast::BinaryOperator::OpType::Gt:
+        return check_cmp(">");
+    case ast::BinaryOperator::OpType::Ge:
+        return check_cmp(">=");
     }
+    return {};
 }
 
 mlir::Type TypeChecker::infer(const ast::Identifier &id) {
@@ -76,6 +118,62 @@ mlir::Type TypeChecker::infer(const ast::Identifier &id) {
         return {};
     }
     return it->second;
+}
+
+mlir::Type TypeChecker::infer(const ast::Call &call) {
+    const auto *id = dynamic_cast<const ast::Identifier *>(call.callee.get());
+    if (!id) {
+        emitter.error(call.loc, "callee is not a function", "not callable");
+        return {};
+    }
+
+    auto it = function_signatures.find(id->name);
+    if (it == function_signatures.end()) {
+        // Undefined-function errors are already reported by the SymbolResolver.
+        return {};
+    }
+    const auto &sig = it->second;
+
+    if (call.args.size() != sig.params.size()) {
+        emitter.error(call.loc,
+                      "function '" + id->name + "' expects " + std::to_string(sig.params.size()) +
+                          " argument(s) but got " + std::to_string(call.args.size()),
+                      "wrong number of arguments");
+        return sig.return_type;
+    }
+
+    for (size_t i = 0; i < call.args.size(); ++i) {
+        auto arg_type = call.args[i]->type_of(*this);
+        if (arg_type && sig.params[i] && arg_type != sig.params[i]) {
+            emitter.error(call.args[i]->loc, "argument type does not match parameter type",
+                          "mismatched type");
+        }
+    }
+    return sig.return_type;
+}
+
+mlir::Type TypeChecker::infer(const ast::IntrinsicCall &intrinsic) {
+    if (intrinsic.name == "assert") {
+        if (intrinsic.args.size() != 1) {
+            emitter.error(intrinsic.loc,
+                          "@assert expects 1 argument but got " +
+                              std::to_string(intrinsic.args.size()),
+                          "wrong number of arguments");
+            return {};
+        }
+        auto cond = intrinsic.args[0]->type_of(*this);
+        auto i1 = mlir::IntegerType::get(&ctx, 1);
+        if (cond && cond != i1) {
+            emitter.error(intrinsic.args[0]->loc, "@assert condition must be a bool",
+                          "expected bool");
+        }
+        // @assert is statement-position and produces no value.
+        return {};
+    }
+
+    emitter.error(intrinsic.loc, "unknown intrinsic '@" + intrinsic.name + "'",
+                  "unknown intrinsic");
+    return {};
 }
 
 mlir::Type TypeChecker::infer(const ast::LetBinding &binding) {
@@ -116,6 +214,14 @@ mlir::Type TypeChecker::infer(const ast::FunctionDecl &function_decl) {
         stmt->type_of(*this);
     }
     // TODO: return function type
+    return {};
+}
+
+mlir::Type TypeChecker::infer(const ast::TestDecl &test_decl) {
+    for (const auto &stmt : test_decl.nodes) {
+        stmt->type_of(*this);
+    }
+    // TODO: return function type?
     return {};
 }
 

@@ -6,6 +6,7 @@
 #include "llvm/ADT/StringMap.h"
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace forge {
 
@@ -22,10 +23,16 @@ class TypeChecker {
     mlir::Type resolve(const ast::UnresolvedTypeRef &);
 
   private:
+    struct FunctionSignature {
+        std::vector<mlir::Type> params;
+        mlir::Type return_type;
+    };
+
     mlir::MLIRContext &ctx;
     DiagnosticEmitter &emitter;
     llvm::StringMap<mlir::Type> type_registry; // built-ins pre-populated; user types added later
     std::unordered_map<std::string, mlir::Type> symbol_types;
+    std::unordered_map<std::string, FunctionSignature> function_signatures;
 };
 
 } // namespace forge

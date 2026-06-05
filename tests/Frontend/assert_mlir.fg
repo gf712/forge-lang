@@ -1,0 +1,11 @@
+// RUN: %forge %s --emit-mlir | %FileCheck %s
+
+// @assert(cond) lowers its predicate to a bool and emits cf.assert with a message
+// synthesized from the predicate's source text.
+
+// CHECK: arith.cmpi eq, {{.*}} : i64
+// CHECK: cf.assert %{{.*}}, "assertion failed: 1 + 2 == 3"
+
+test "asserts" {
+	@assert(1 + 2 == 3)
+}

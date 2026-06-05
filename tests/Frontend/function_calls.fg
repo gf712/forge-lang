@@ -1,0 +1,26 @@
+// RUN: %forge %s --emit-mlir | %FileCheck %s
+
+// A call resolves to the named function and lowers to func.call. Functions may
+// be referenced before they are defined (forward reference / recursion), which
+// is why `early` calls `late` even though `late` appears later in the file.
+
+// CHECK: func.func @early
+// CHECK:   call @late
+// CHECK: func.func @late
+// CHECK: func.func private @__test.0() attributes {forge.test_name = "test_calls"}
+// CHECK:   %[[A:.*]] = arith.constant 1 : i64
+// CHECK:   %[[B:.*]] = arith.constant 2 : i64
+// CHECK:   call @early(%[[A]], %[[B]]) : (i64, i64) -> i64
+
+fn early(a: i64, b: i64) -> i64 {
+	let s = a + b;
+	return late(s);
+}
+
+fn late(x: i64) -> i64 {
+	x
+}
+
+test "test_calls" {
+	early(1, 2)
+}

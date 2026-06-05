@@ -1,0 +1,14 @@
+// RUN: not --crash %forge test %s 2>&1 | %FileCheck %s
+
+// A test whose assertion is false prints the synthesized message and aborts via
+// abort()/SIGABRT (a crash, hence `not --crash`); FileCheck sees the message.
+
+// CHECK: assertion failed: add(1, 2) == 4
+
+fn add(a: i64, b: i64) -> i64 {
+	a + b
+}
+
+test "addition is wrong" {
+	@assert(add(1, 2) == 4)
+}

@@ -5,7 +5,6 @@
 #include <peglib.h>
 
 #include <print>
-#include <ranges>
 
 static llvm::SMRange to_range(const char *base, const peg::Ast &node) {
     auto s = llvm::SMLoc::getFromPointer(base + node.position);
@@ -23,6 +22,49 @@ static std::unique_ptr<ast::Expression> convert(const peg::Ast &node, const char
         auto id = std::make_unique<ast::Identifier>(std::string(node.token));
         id->loc = to_range(base, node);
         return id;
+    }
+    if (node.name == "comparison" && node.nodes.size() > 1) {
+        // comparison <- additive (cmp_op additive)?  — non-associative, so exactly
+        // three children when a comparison is present: [lhs, cmp_op, rhs].
+        auto lhs = convert(*node.nodes[0], base);
+        const auto &op_node = *node.nodes[1];
+        auto rhs = convert(*node.nodes[2], base);
+        ast::BinaryOperator::OpType op_type;
+        if (op_node.token == "==") {
+            op_type = ast::BinaryOperator::OpType::Eq;
+        } else if (op_node.token == "!=") {
+            op_type = ast::BinaryOperator::OpType::Ne;
+        } else if (op_node.token == "<=") {
+            op_type = ast::BinaryOperator::OpType::Le;
+        } else if (op_node.token == ">=") {
+            op_type = ast::BinaryOperator::OpType::Ge;
+        } else if (op_node.token == "<") {
+            op_type = ast::BinaryOperator::OpType::Lt;
+        } else {
+            op_type = ast::BinaryOperator::OpType::Gt;
+        }
+        llvm::SMRange loc{lhs->loc.Start, rhs->loc.End};
+        auto binop = std::make_unique<ast::BinaryOperator>(op_type, std::move(lhs), std::move(rhs));
+        binop->loc = loc;
+        return binop;
+    }
+    if (node.name == "intrinsic_call") {
+        // intrinsic_call <- '@' ident '(' arg_list? ')'  — children: [ident, arg_list?]
+        std::string name{node.nodes.front()->token};
+        std::vector<std::unique_ptr<ast::Expression>> args;
+        for (size_t i = 1; i < node.nodes.size(); ++i) {
+            const auto &child = *node.nodes[i];
+            if (child.name == "arg_list") {
+                for (const auto &arg : child.nodes) {
+                    args.push_back(convert(*arg, base));
+                }
+            } else {
+                args.push_back(convert(child, base));
+            }
+        }
+        auto intrinsic = std::make_unique<ast::IntrinsicCall>(std::move(name), std::move(args));
+        intrinsic->loc = to_range(base, node);
+        return intrinsic;
     }
     if ((node.name == "additive" || node.name == "multiplicative") && node.nodes.size() > 1) {
         // Children alternate: operand, op, operand, op, operand, ...
@@ -47,6 +89,30 @@ static std::unique_ptr<ast::Expression> convert(const peg::Ast &node, const char
             result = std::move(binop);
         }
         return result;
+    }
+    if (node.name == "postfix") {
+        // postfix <- primary call_suffix*  — children: [callee, call_suffix, ...]
+        // Each call_suffix turns the running expression into a Call (supports f()()).
+        auto callee = convert(*node.nodes[0], base);
+        for (size_t i = 1; i < node.nodes.size(); ++i) {
+            const auto &suffix = *node.nodes[i]; // call_suffix
+            std::vector<std::unique_ptr<ast::Expression>> args;
+            for (const auto &child : suffix.nodes) {
+                if (child->name == "arg_list") {
+                    for (const auto &arg : child->nodes) {
+                        args.push_back(convert(*arg, base));
+                    }
+                } else {
+                    // arg_list with a single argument collapses to the bare expression.
+                    args.push_back(convert(*child, base));
+                }
+            }
+            llvm::SMRange loc{callee->loc.Start, to_range(base, suffix).End};
+            auto call = std::make_unique<ast::Call>(std::move(callee), std::move(args));
+            call->loc = loc;
+            callee = std::move(call);
+        }
+        return callee;
     }
     // Pass-through: expr, atom, single-child additive
     if (!node.nodes.empty()) {
@@ -90,10 +156,14 @@ static std::unique_ptr<ast::Node> convert_stmt(const peg::Ast &node, const char 
         return binding;
     }
     if (node.name == "fn_definition") {
+        // Grammar: 'fn' ident '(' params? ')' '->' ident block
+        // Children: [name, params?, return_type, block]
         std::string fn_name{node.nodes.front()->token};
+
+        size_t idx = 1;
         std::vector<ast::FunctionDecl::ParamType> params;
-        if (auto parsed_params = node.nodes[1]; parsed_params->name == "params") {
-            for (const auto &param : parsed_params->nodes) {
+        if (node.nodes[idx]->name == "params") {
+            for (const auto &param : node.nodes[idx]->nodes) {
                 assert(param->name == "param");
                 assert(param->nodes.size() == 2);
                 std::string param_name{param->nodes.front()->token};
@@ -102,18 +172,39 @@ static std::unique_ptr<ast::Node> convert_stmt(const peg::Ast &node, const char 
                     std::move(param_name),
                     ast::UnresolvedTypeRef{std::move(type), to_range(base, *param->nodes.back())});
             }
+            ++idx;
         }
-        auto parsed_return_type = node.nodes[2];
-        assert(parsed_return_type->is_token);
-        ast::UnresolvedTypeRef return_type{std::string{parsed_return_type->token},
-                                           to_range(base, *parsed_return_type)};
 
+        const auto &return_type_node = *node.nodes[idx++];
+        assert(return_type_node.is_token);
+        ast::UnresolvedTypeRef return_type{std::string{return_type_node.token},
+                                           to_range(base, return_type_node)};
+
+        const auto &block_node = *node.nodes[idx];
+        assert(block_node.name == "block");
         std::vector<std::unique_ptr<ast::Node>> body;
-        for (const auto &child : node.nodes | std::views::drop(3)) {
-            body.push_back(convert_stmt(*child, base));
+        for (const auto &stmt_node : block_node.nodes) {
+            if (auto converted = convert_stmt(*stmt_node, base)) {
+                body.push_back(std::move(converted));
+            }
         }
         return std::make_unique<ast::FunctionDecl>(std::move(fn_name), std::move(params),
                                                    std::move(return_type), std::move(body));
+    }
+    if (node.name == "test_definition") {
+        // Grammar: 'test' string_literal block
+        // Children: [block]
+        std::string fn_name{node.nodes.front()->token};
+
+        const auto &block_node = *node.nodes[1];
+        assert(block_node.name == "block");
+        std::vector<std::unique_ptr<ast::Node>> body;
+        for (const auto &stmt_node : block_node.nodes) {
+            if (auto converted = convert_stmt(*stmt_node, base)) {
+                body.push_back(std::move(converted));
+            }
+        }
+        return std::make_unique<ast::TestDecl>(std::move(fn_name), std::move(body));
     }
     return convert(node, base);
 }

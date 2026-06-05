@@ -5,6 +5,8 @@ target_link_libraries(
            MLIRLLVMCommonConversion
            MLIRArithToLLVM
            MLIRArithTransforms
+           MLIRControlFlowToLLVM
+           MLIRControlFlowDialect
            MLIRFuncToLLVM
            MLIRDialect
            MLIRIR)

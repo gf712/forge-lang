@@ -1,6 +1,8 @@
+#include <cstdio>
 #include <cstdlib>
 #include <print>
 #include <string_view>
+#include <vector>
 
 #include "forge/Conversion/ASTToMLIR/MLIRGenerator.h"
 #include "forge/Conversion/MLIRToLLVM/Passes.h"
@@ -14,13 +16,14 @@
 #include "llvm/Support/raw_ostream.h"
 
 static void print_usage(std::string_view name) {
-    std::println("Usage: {} [--emit-mlir] [--emit-llvm] <filename>", name);
+    std::println("Usage: {} [build|test] [--emit-mlir] [--emit-llvm] <filename>", name);
 }
 
 int main(int argc, char **argv) {
     bool emit_mlir = false;
     bool emit_llvm = false;
-    std::string_view source_path;
+    bool run_tests = false;
+    std::vector<std::string_view> positionals;
 
     for (int i = 1; i < argc; ++i) {
         std::string_view arg{argv[i]};
@@ -29,8 +32,20 @@ int main(int argc, char **argv) {
         } else if (arg == "--emit-llvm") {
             emit_llvm = true;
         } else {
-            source_path = arg;
+            positionals.push_back(arg);
         }
+    }
+
+    // Optional leading subcommand: `build` (default) or `test`. Anything else is
+    // treated as the source file, so `forge <file>` keeps working as a build.
+    std::string_view source_path;
+    size_t file_index = 0;
+    if (!positionals.empty() && (positionals[0] == "build" || positionals[0] == "test")) {
+        run_tests = (positionals[0] == "test");
+        file_index = 1;
+    }
+    if (file_index < positionals.size()) {
+        source_path = positionals[file_index];
     }
 
     if (source_path.empty()) {
@@ -61,7 +76,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    auto mod = MLIRGenerator::compile(std::move(ast));
+    auto mod = MLIRGenerator::compile(std::move(ast), run_tests);
 
     if (emit_mlir) {
         llvm::outs() << *mod.module_op << '\n';
@@ -79,5 +94,7 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
+    // Make stdout unbuffered so the assertion text is observable before the process aborts.
+    std::setbuf(stdout, nullptr);
     return forge::execute(mod) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

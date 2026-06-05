@@ -33,12 +33,15 @@ struct UnresolvedTypeRef final : TypeExpr {
 
 #define AST_NODE_TYPES                                                                             \
     __AST_NODE_TYPE(BinaryOperator)                                                                \
+    __AST_NODE_TYPE(Call)                                                                          \
+    __AST_NODE_TYPE(IntrinsicCall)                                                                 \
     __AST_NODE_TYPE(Identifier)                                                                    \
     __AST_NODE_TYPE(IntLiteral)                                                                    \
     __AST_NODE_TYPE(LetBinding)                                                                    \
     __AST_NODE_TYPE(Module)                                                                        \
     __AST_NODE_TYPE(FunctionDecl)                                                                  \
-    __AST_NODE_TYPE(ReturnStmt)
+    __AST_NODE_TYPE(ReturnStmt)                                                                    \
+    __AST_NODE_TYPE(TestDecl)
 
 enum class ASTNodeType {
 #define __AST_NODE_TYPE(X) X,
@@ -69,7 +72,7 @@ struct IntLiteral final : Literal {
 struct Operator : Expression {};
 
 struct BinaryOperator final : Operator {
-    enum class OpType { Add, Sub, Mul, Div };
+    enum class OpType { Add, Sub, Mul, Div, Eq, Ne, Lt, Le, Gt, Ge };
 
     OpType op;
     std::unique_ptr<Expression> lhs;
@@ -86,6 +89,26 @@ struct BinaryOperator final : Operator {
 struct Identifier final : Expression {
     std::string name;
     Identifier(std::string name) : name(std::move(name)) {}
+    mlir::Value visit(MLIRGenerator &) const final;
+    mlir::Type type_of(forge::TypeChecker &) const final;
+    void resolve(forge::SymbolResolver &) const final;
+};
+
+struct Call final : Expression {
+    std::unique_ptr<Expression> callee;
+    std::vector<std::unique_ptr<Expression>> args;
+    Call(std::unique_ptr<Expression> callee, std::vector<std::unique_ptr<Expression>> args)
+        : callee(std::move(callee)), args(std::move(args)) {}
+    mlir::Value visit(MLIRGenerator &) const final;
+    mlir::Type type_of(forge::TypeChecker &) const final;
+    void resolve(forge::SymbolResolver &) const final;
+};
+
+struct IntrinsicCall final : Expression {
+    std::string name;
+    std::vector<std::unique_ptr<Expression>> args;
+    IntrinsicCall(std::string name, std::vector<std::unique_ptr<Expression>> args)
+        : name(std::move(name)), args(std::move(args)) {}
     mlir::Value visit(MLIRGenerator &) const final;
     mlir::Type type_of(forge::TypeChecker &) const final;
     void resolve(forge::SymbolResolver &) const final;
@@ -115,6 +138,18 @@ struct FunctionDecl final : Node {
                  std::vector<std::unique_ptr<Node>> nodes)
         : name(std::move(name)), params(std::move(params)), return_type(std::move(return_type)),
           nodes(std::move(nodes)) {}
+
+    mlir::Value visit(MLIRGenerator &) const final;
+    mlir::Type type_of(forge::TypeChecker &) const final;
+    void resolve(forge::SymbolResolver &) const final;
+};
+
+struct TestDecl final : Node {
+    std::string name;
+    std::vector<std::unique_ptr<Node>> nodes;
+
+    TestDecl(std::string name, std::vector<std::unique_ptr<Node>> nodes)
+        : name(std::move(name)), nodes(std::move(nodes)) {}
 
     mlir::Value visit(MLIRGenerator &) const final;
     mlir::Type type_of(forge::TypeChecker &) const final;

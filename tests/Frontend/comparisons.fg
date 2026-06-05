@@ -1,0 +1,21 @@
+// RUN: %forge %s --emit-mlir | %FileCheck %s
+
+// Each comparison operator lowers to arith.cmpi with the matching signed predicate
+// and produces an i1. Comparisons bind looser than arithmetic, so `1 + 1 == 2` is
+// `(1 + 1) == 2`.
+
+// CHECK: arith.cmpi eq, {{.*}} : i64
+// CHECK: arith.cmpi ne, {{.*}} : i64
+// CHECK: arith.cmpi slt, {{.*}} : i64
+// CHECK: arith.cmpi sle, {{.*}} : i64
+// CHECK: arith.cmpi sgt, {{.*}} : i64
+// CHECK: arith.cmpi sge, {{.*}} : i64
+
+test "comparisons" {
+	let a = 1 + 1 == 2;
+	let b = 1 != 2;
+	let c = 1 < 2;
+	let d = 1 <= 2;
+	let e = 1 > 2;
+	let f = 1 >= 2;
+}

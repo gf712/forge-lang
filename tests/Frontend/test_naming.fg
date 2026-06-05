@@ -1,0 +1,23 @@
+// RUN: %forge %s --emit-mlir | %FileCheck %s
+
+// Test names may be any string — including spaces and duplicates — because the
+// MLIR symbol is anonymous (@__test.N) and the human-readable name is preserved
+// as a private attribute. In build mode (no `test` subcommand) __main does NOT
+// call the tests.
+
+// CHECK:      func.func @__main()
+// CHECK-NOT:    call @__test
+// CHECK:      func.func private @__test.0() attributes {forge.test_name = "a name with spaces"}
+// CHECK:      func.func private @__test.1() attributes {forge.test_name = "a name with spaces"}
+
+fn add(a: i64, b: i64) -> i64 {
+	a + b
+}
+
+test "a name with spaces" {
+	add(1, 2)
+}
+
+test "a name with spaces" {
+	add(3, 4)
+}

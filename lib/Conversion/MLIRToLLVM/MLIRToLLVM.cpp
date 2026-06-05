@@ -1,5 +1,6 @@
 #include "forge/Conversion/MLIRToLLVM/Passes.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -17,6 +18,9 @@ bool forge::lower(forge::CompiledModule &mod) {
     mlir::LLVMTypeConverter type_converter{mod.ctx.get()};
     mlir::arith::populateArithToLLVMConversionPatterns(type_converter, patterns);
     mlir::populateFuncToLLVMConversionPatterns(type_converter, patterns);
+    mlir::cf::populateControlFlowToLLVMConversionPatterns(type_converter, patterns);
+    mlir::cf::populateAssertToLLVMConversionPattern(type_converter, patterns,
+                                                    /*abortOnFailure=*/true);
 
     mlir::FrozenRewritePatternSet frozen{std::move(patterns)};
     if (mlir::failed(mlir::applyFullConversion(mod.module_op.getOperation(), target, frozen))) {

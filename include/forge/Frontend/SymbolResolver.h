@@ -18,7 +18,8 @@ class SymbolResolver {
 
   private:
     DiagnosticEmitter &emitter;
-    std::unordered_set<std::string> symbols;
+    std::unordered_set<std::string> variables; // names visible in the current body scope
+    std::unordered_set<std::string> functions; // top-level functions, visible everywhere
 };
 
 } // namespace forge

@@ -1,0 +1,22 @@
+// RUN: %forge test %s --emit-mlir | %FileCheck %s
+
+// Under the `test` subcommand, __main invokes every test function in source
+// order (after any top-level statements), via calls to the anonymous symbols.
+
+// CHECK:      func.func @__main()
+// CHECK:        call @__test.0() : () -> ()
+// CHECK-NEXT:   call @__test.1() : () -> ()
+// CHECK:      func.func private @__test.0() attributes {forge.test_name = "first"}
+// CHECK:      func.func private @__test.1() attributes {forge.test_name = "second"}
+
+fn add(a: i64, b: i64) -> i64 {
+	a + b
+}
+
+test "first" {
+	add(1, 2)
+}
+
+test "second" {
+	add(3, 4)
+}
