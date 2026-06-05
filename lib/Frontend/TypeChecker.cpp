@@ -1,4 +1,5 @@
 #include "forge/Frontend/TypeChecker.h"
+#include "forge/Frontend/TypeRegistry.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Types.h"
 
@@ -17,11 +18,10 @@ namespace forge {
 
 TypeChecker::TypeChecker(mlir::MLIRContext &ctx, DiagnosticEmitter &emitter)
     : ctx(ctx), emitter(emitter) {
-    type_registry["bool"] = mlir::IntegerType::get(&ctx, 1);
-    type_registry["i32"] = mlir::IntegerType::get(&ctx, 32);
-    type_registry["i64"] = mlir::IntegerType::get(&ctx, 64);
-    type_registry["f32"] = mlir::Float32Type::get(&ctx);
-    type_registry["f64"] = mlir::Float64Type::get(&ctx);
+    BuiltinTypeRegistry builtin_types{ctx};
+    for (const auto &[name, type] : builtin_types.types()) {
+        type_registry.try_emplace(name, type);
+    }
 }
 
 bool TypeChecker::check(const ast::Module &module) {

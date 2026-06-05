@@ -1,5 +1,6 @@
 #include "forge/Conversion/ASTToMLIR/MLIRGenerator.h"
 #include "forge/Frontend/AST.h"
+#include "forge/Frontend/TypeRegistry.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -137,20 +138,9 @@ mlir::Value MLIRGenerator::generate(const ast::ReturnStmt &return_stmt) {
 }
 
 mlir::Type MLIRGenerator::resolve_type(const ast::UnresolvedTypeRef &type_ref) {
-    if (type_ref.name == "bool") {
-        return mlir::IntegerType::get(&ctx, 1);
-    }
-    if (type_ref.name == "i32") {
-        return mlir::IntegerType::get(&ctx, 32);
-    }
-    if (type_ref.name == "i64") {
-        return mlir::IntegerType::get(&ctx, 64);
-    }
-    if (type_ref.name == "f32") {
-        return mlir::Float32Type::get(&ctx);
-    }
-    if (type_ref.name == "f64") {
-        return mlir::Float64Type::get(&ctx);
+    auto it = builtin_types.types().find(type_ref.name);
+    if (it != builtin_types.types().end()) {
+        return it->second;
     }
     return {};
 }
@@ -255,6 +245,7 @@ forge::CompiledModule MLIRGenerator::compile(std::unique_ptr<ast::Module> module
     MLIRGenerator generator{
         .builder = mlir::OpBuilder{mod.ctx.get()},
         .ctx = *mod.ctx,
+        .builtin_types = forge::BuiltinTypeRegistry{*mod.ctx},
     };
     mod.module_op = generator.generate_module(*module_node, run_tests);
     return mod;

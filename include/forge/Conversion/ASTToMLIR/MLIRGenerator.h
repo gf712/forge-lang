@@ -1,5 +1,6 @@
 #pragma once
 #include "forge/Frontend/AST.h"
+#include "forge/Frontend/TypeRegistry.h"
 #include "forge/IR/Module.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
@@ -13,6 +14,7 @@ struct MLIRGenerator {
     mlir::MLIRContext &ctx;
     std::unordered_map<std::string, mlir::Value> value_map;
     std::vector<std::string> test_symbols; // anonymous symbols of emitted test funcs, in order
+    forge::BuiltinTypeRegistry builtin_types;
 
 #define __AST_NODE_TYPE(TYPE) mlir::Value generate(const ast::TYPE &);
     AST_NODE_TYPES
