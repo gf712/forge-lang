@@ -2,6 +2,7 @@
 import os
 
 config.forge_binary      = "@FORGE_BINARY@"
+config.forge_opt_binary  = "@FORGE_OPT_BINARY@"
 config.filecheck_binary  = "@FILECHECK_BINARY@"
 config.llvm_tools_dir    = "@LLVM_TOOLS_BINARY_DIR@"
 config.test_source_root  = "@CMAKE_CURRENT_SOURCE_DIR@"

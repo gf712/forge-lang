@@ -7,4 +7,5 @@ target_link_libraries(
             ForgeDiagnostics
             ForgeConversionASTToMLIR
             ForgeConversionMLIRToLLVM
-            ForgeTargetJIT)
+            ForgeTargetJIT
+            ForgeMLIRDialect)

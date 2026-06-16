@@ -15,6 +15,12 @@ find_package(LLVM CONFIG REQUIRED)
 message("LLVM_INSTALL_PREFIX: ${LLVM_INSTALL_PREFIX}")
 find_package(MLIR CONFIG REQUIRED PATHS ${LLVM_INSTALL_PREFIX}/lib/cmake/mlir/)
 
+list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+include(TableGen)
+include(AddLLVM)
+include(AddMLIR)
+
 project_options(
     PREFIX
     "myproject"
@@ -48,6 +54,7 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(cpp_peglib)
 
+add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
 add_subdirectory(tests)

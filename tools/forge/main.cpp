@@ -7,6 +7,7 @@
 #include "forge/Conversion/ASTToMLIR/MLIRGenerator.h"
 #include "forge/Conversion/MLIRToLLVM/Passes.h"
 #include "forge/Diagnostics/Emitter.h"
+#include "forge/Dialect/Forge/ForgeDialect.h"
 #include "forge/Frontend/Parser.h"
 #include "forge/Frontend/SymbolResolver.h"
 #include "forge/Frontend/TypeChecker.h"
@@ -70,6 +71,7 @@ int main(int argc, char **argv) {
 
     {
         mlir::MLIRContext type_ctx;
+        type_ctx.loadDialect<mlir::forge::ForgeDialect>();
         forge::TypeChecker checker{type_ctx, emitter};
         if (!checker.check(*ast)) {
             return EXIT_FAILURE;
