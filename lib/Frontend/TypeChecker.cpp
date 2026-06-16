@@ -1,5 +1,6 @@
 #include "forge/Frontend/TypeChecker.h"
 #include "forge/Frontend/TypeRegistry.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Types.h"
 
@@ -35,6 +36,7 @@ bool TypeChecker::check(const ast::Module &module) {
                 sig.params.push_back(param_type.resolve(*this));
             }
             sig.return_type = fn->return_type.resolve(*this);
+            functions[fn] = sig;
             function_signatures[fn->name] = std::move(sig);
         }
     }
@@ -201,8 +203,17 @@ mlir::Type TypeChecker::infer(const ast::LetBinding &binding) {
 }
 
 mlir::Type TypeChecker::infer(const ast::ReturnStmt &return_stmt) {
-    [[maybe_unused]] auto return_type = return_stmt.expr->type_of(*this);
-    // TODO: check return type match function signature
+    auto stmt_return_type = [this, &return_stmt]() -> mlir::Type {
+        if (return_stmt.expr == nullptr) {
+            return mlir::NoneType::get(&ctx);
+        }
+        return return_stmt.expr->type_of(*this);
+    }();
+    const auto &expected_return_type = return_type.top();
+    if (stmt_return_type != expected_return_type) {
+        // TODO stringify return type and show to user type mismatch
+        emitter.error(return_stmt.loc, "return type mismatch", "type mismatch");
+    }
     return {};
 }
 
@@ -210,18 +221,20 @@ mlir::Type TypeChecker::infer(const ast::FunctionDecl &function_decl) {
     for (const auto &[param_name, param_type] : function_decl.params) {
         symbol_types[param_name] = param_type.resolve(*this);
     }
+    return_type.push(functions.at(&function_decl).return_type);
     for (const auto &stmt : function_decl.nodes) {
         stmt->type_of(*this);
     }
-    // TODO: return function type
+    return_type.pop();
     return {};
 }
 
 mlir::Type TypeChecker::infer(const ast::TestDecl &test_decl) {
+    return_type.push(mlir::NoneType::get(&ctx));
     for (const auto &stmt : test_decl.nodes) {
         stmt->type_of(*this);
     }
-    // TODO: return function type?
+    return_type.pop();
     return {};
 }
 

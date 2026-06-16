@@ -132,8 +132,12 @@ mlir::Value MLIRGenerator::generate(const ast::IntrinsicCall &intrinsic) {
 }
 
 mlir::Value MLIRGenerator::generate(const ast::ReturnStmt &return_stmt) {
-    auto return_value = return_stmt.expr->visit(*this);
-    mlir::func::ReturnOp::create(builder, builder.getUnknownLoc(), {return_value});
+    if (return_stmt.expr) {
+        auto return_value = return_stmt.expr->visit(*this);
+        mlir::func::ReturnOp::create(builder, builder.getUnknownLoc(), {return_value});
+    } else {
+        mlir::func::ReturnOp::create(builder, builder.getUnknownLoc(), {});
+    }
     return nullptr;
 }
 

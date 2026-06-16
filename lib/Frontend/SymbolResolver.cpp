@@ -66,7 +66,11 @@ void SymbolResolver::check(const ast::LetBinding &binding) {
     variables.insert(binding.name);
 }
 
-void SymbolResolver::check(const ast::ReturnStmt &return_stmt) { return_stmt.expr->resolve(*this); }
+void SymbolResolver::check(const ast::ReturnStmt &return_stmt) {
+    if (auto &expr = return_stmt.expr) {
+        expr->resolve(*this);
+    }
+}
 
 void SymbolResolver::check(const ast::FunctionDecl &function_decl) {
     // Each body gets a fresh variable scope seeded with its parameters; functions

@@ -1,0 +1,26 @@
+// RUN: not %forge test %s 2>&1 | %FileCheck %s
+
+// A function whose tail expression type differs from the declared return type.
+// CHECK: return type mismatch
+fn add(a: i64, b: i64) -> f64 {
+	a + b
+}
+
+// A function body that falls off the end (so it implicitly returns unit) while
+// declaring a non-unit return type. The injected void return must be compared
+// against the signature, not silently accepted.
+// CHECK: return type mismatch
+fn no_return(a: i64) -> i64 {
+	let x = a + 1;
+}
+
+// An explicit `return` of a value inside a test. Tests return unit, so a value
+// return is a mismatch (and must not read an empty return-type stack).
+// CHECK: return type mismatch
+test "explicit value return in test" {
+	return 1 + 1;
+}
+
+test "return type mismatch" {
+	@assert(add(1, 2) == 3)
+}

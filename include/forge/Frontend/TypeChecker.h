@@ -4,6 +4,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Types.h"
 #include "llvm/ADT/StringMap.h"
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -33,6 +34,8 @@ class TypeChecker {
     llvm::StringMap<mlir::Type> type_registry; // built-ins pre-populated; user types added later
     std::unordered_map<std::string, mlir::Type> symbol_types;
     std::unordered_map<std::string, FunctionSignature> function_signatures;
+    std::unordered_map<const ast::FunctionDecl *, FunctionSignature> functions;
+    std::stack<mlir::Type> return_type;
 };
 
 } // namespace forge

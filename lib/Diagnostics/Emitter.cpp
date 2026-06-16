@@ -2,6 +2,7 @@
 #include "pretty_diagnostics/renderer.hpp"
 #include "pretty_diagnostics/report.hpp"
 #include "pretty_diagnostics/source.hpp"
+#include <cassert>
 #include <sstream>
 
 namespace forge {
@@ -25,6 +26,7 @@ DiagnosticEmitter::get_source(unsigned buffer_id) {
 }
 
 pretty_diagnostics::Span DiagnosticEmitter::make_span(llvm::SMRange range) {
+    assert(range.isValid() && "diagnostic span has no source location");
     auto buf_id = source_mgr_.FindBufferContainingLoc(range.Start);
     auto source = get_source(buf_id);
 

@@ -184,9 +184,20 @@ static std::unique_ptr<ast::Node> convert_stmt(const peg::Ast &node, const char 
         assert(block_node.name == "block");
         std::vector<std::unique_ptr<ast::Node>> body;
         for (const auto &stmt_node : block_node.nodes) {
+            if (stmt_node->name == "expression") {
+                auto expr = convert(*stmt_node, base);
+                auto stmt = std::make_unique<ast::ReturnStmt>(std::move(expr));
+                stmt->loc = to_range(base, *stmt_node);
+                body.push_back(std::move(stmt));
+                break;
+            }
             if (auto converted = convert_stmt(*stmt_node, base)) {
                 body.push_back(std::move(converted));
             }
+        }
+        if (body.empty() || dynamic_cast<ast::ReturnStmt *>(body.back().get()) == nullptr) {
+            auto &return_stmt = body.emplace_back(std::make_unique<ast::ReturnStmt>(nullptr));
+            return_stmt->loc = to_range(base, node);
         }
         return std::make_unique<ast::FunctionDecl>(std::move(fn_name), std::move(params),
                                                    std::move(return_type), std::move(body));
